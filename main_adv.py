@@ -13,15 +13,19 @@ import torch.utils.data
 import matplotlib.pyplot as plt
 import torchvision.models as models
 from utils import *
+import torchvision.transforms as transforms
 
 parser = argparse.ArgumentParser(description='PyTorch Adversarial Training')
+
+parser.add_argument('--mode', type=str, default=None)
+parser.add_argument('--eb', type=str, default=None)
 
 ########################## data setting ##########################
 parser.add_argument('--data', type=str, default='data/cifar10', help='location of the data corpus', required=True)
 parser.add_argument('--dataset', type=str, default='cifar10', help='dataset [cifar10, cifar100, tinyimagenet]', required=True)
 
 ########################## model setting ##########################
-parser.add_argument('--arch', type=str, default='resnet18', help='model architecture [resnet18, wideresnet, vgg16]', required=True)
+parser.add_argument('--arch', type=str, default='resnet18', help='model architecture [resnet18, resnet50, vgg16]', required=True)
 parser.add_argument('--depth_factor', default=34, type=int, help='depth-factor of wideresnet')
 parser.add_argument('--width_factor', default=10, type=int, help='width-factor of wideresnet')
 
@@ -37,10 +41,10 @@ parser.add_argument('--save_dir', help='The directory used to save the trained m
 ########################## training setting ##########################
 parser.add_argument('--batch_size', type=int, default=128, help='batch size')
 parser.add_argument('--lr', default=0.1, type=float, help='initial learning rate')
-parser.add_argument('--decreasing_lr', default='50,150', help='decreasing strategy')
+parser.add_argument('--decreasing_lr', default='100,105', help='decreasing strategy')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
 parser.add_argument('--weight_decay', default=5e-4, type=float, help='weight decay')
-parser.add_argument('--epochs', default=200, type=int, help='number of total epochs to run')
+parser.add_argument('--epochs', default=110, type=int, help='number of total epochs to run')
 
 ########################## attack setting ##########################
 parser.add_argument('--norm', default='linf', type=str, help='linf or l2')
@@ -69,6 +73,34 @@ parser.add_argument('--temperature', type=float, default=2.0, help='temperature 
 parser.add_argument('--lwf_start', type=int, default=0, metavar='N', help='start point of lwf (default: 200)')
 parser.add_argument('--lwf_end', type=int, default=200, metavar='N', help='end point of lwf (default: 200)')
 
+def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
+    with open(str(args.save_dir)+'/log.txt', 'a') as f:
+        f.write(str(epoch)+' '+
+                str(test_sa)+' '+
+                str(test_ra)+' '+
+                str(val_sa)+' '+
+                str(val_ra)+'\n')
+    if bool(args.eb):
+        global eb30_found, eb50_found, eb70_found
+        global eb30, eb50, eb70
+        if (not eb30_found) and eb30.early_bird_emerge(model):
+            print('[Early Bird] Found an EB30 Ticket @',log_info['epoch'])
+            eb30_found = True
+            torch.save(model.state_dict(), 'store/'+log_folder+'/eb30.pt')
+            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+                f.write(f'Found EB30 Ticket @ {log_info["epoch"]} \n')
+        if (not eb50_found) and eb50.early_bird_emerge(model):
+            print('[Early Bird] Found an EB50 Ticket @',log_info['epoch'])
+            eb50_found = True
+            torch.save(model.state_dict(), 'store/'+log_folder+'/eb50.pt')
+            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+                f.write(f'Found EB50 Ticket @ {log_info["epoch"]} \n')
+        if (not eb70_found) and eb70.early_bird_emerge(model):
+            print('[Early Bird] Found an EB70 Ticket @',log_info['epoch'])
+            eb70_found = True
+            torch.save(model.state_dict(), 'store/'+log_folder+'/eb70.pt')
+            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+                f.write(f'Found EB70 Ticket @ {log_info["epoch"]} \n')
 
 def main():
 
@@ -78,8 +110,10 @@ def main():
     args.test_eps = args.test_eps / 255
     args.test_gamma = args.test_gamma / 255
     print_args(args)
+    dataset = args.dataset
     print(args)
 
+    args.save_dir = 'store/'+str(args.save_dir)
 
     torch.cuda.set_device(int(args.gpu))
 
@@ -87,16 +121,21 @@ def main():
         print('set random seed = ', args.seed)
         setup_seed(args.seed)
 
-    train_loader, val_loader, test_loader, model, swa_model, teacher1, teacher2 = setup_dataset_models(args)
+    transform_list = [transforms.ToTensor()]
+    transform_chain = transforms.Compose(transform_list)
+    if dataset == 'cifar10':
+        num_classes=10
+        train_loader, val_loader, test_loader = cifar10_dataloaders(data_dir=args.data)
+    elif dataset == 'cifar100':
+        num_classes=100
+        train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
 
-    if args.swa:
-        swa_model.cuda()
-        swa_n = 0        
-    if args.lwf:
-        teacher1.cuda()
-        teacher2.cuda()
-
-    model.cuda()
+    if args.arch == 'vgg16':
+        model = vgg(16, dataset=args.dataset, seed=0).cuda()
+    if args.arch == 'resnet18':
+        model = resnet18(seed=0, num_classes=num_classes).cuda()
+    if args.arch == 'resnet50':
+        model = resnet50_official(seed=0, num_classes=num_classes).cuda()
 
     ########################## optimizer and scheduler ##########################
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
@@ -108,61 +147,61 @@ def main():
 
 
     ######################### only evaluation ###################################
-    if args.eval:
-        assert args.pretrained
-        pretrained_model = torch.load(args.pretrained, map_location = torch.device('cuda:'+str(args.gpu)))
-        if args.swa:
-            print('loading from swa_state_dict')
-            pretrained_model = pretrained_model['swa_state_dict']
-        else:
-            print('loading from state_dict')
-            if 'state_dict' in pretrained_model.keys():
-                pretrained_model = pretrained_model['state_dict']
-        model.load_state_dict(pretrained_model)
-        test(test_loader, model, criterion, args)
-        test_adv(test_loader, model, criterion, args)
-        return 
+    # if args.eval:
+    #     assert args.pretrained
+    #     pretrained_model = torch.load(args.pretrained, map_location = torch.device('cuda:'+str(args.gpu)))
+    #     if args.swa:
+    #         print('loading from swa_state_dict')
+    #         pretrained_model = pretrained_model['swa_state_dict']
+    #     else:
+    #         print('loading from state_dict')
+    #         if 'state_dict' in pretrained_model.keys():
+    #             pretrained_model = pretrained_model['state_dict']
+    #     model.load_state_dict(pretrained_model)
+    #     test(test_loader, model, criterion, args)
+    #     test_adv(test_loader, model, criterion, args)
+    #     return 
 
     os.makedirs(args.save_dir, exist_ok=True)
 
     ########################## loading teacher model weight ##########################
-    if args.lwf:
-        print('loading teacher model')
-        t1_checkpoint = torch.load(args.t_weight1, map_location = torch.device('cuda:'+str(args.gpu)))
-        if 'state_dict' in t1_checkpoint.keys():
-            t1_checkpoint = t1_checkpoint['state_dict']
-        teacher1.load_state_dict(t1_checkpoint)
-        t2_checkpoint = torch.load(args.t_weight2, map_location = torch.device('cuda:'+str(args.gpu)))
-        if 'state_dict' in t2_checkpoint.keys():
-            t2_checkpoint = t2_checkpoint['state_dict']
-        teacher2.load_state_dict(t2_checkpoint)
+    # if args.lwf:
+    #     print('loading teacher model')
+    #     t1_checkpoint = torch.load(args.t_weight1, map_location = torch.device('cuda:'+str(args.gpu)))
+    #     if 'state_dict' in t1_checkpoint.keys():
+    #         t1_checkpoint = t1_checkpoint['state_dict']
+    #     teacher1.load_state_dict(t1_checkpoint)
+    #     t2_checkpoint = torch.load(args.t_weight2, map_location = torch.device('cuda:'+str(args.gpu)))
+    #     if 'state_dict' in t2_checkpoint.keys():
+    #         t2_checkpoint = t2_checkpoint['state_dict']
+    #     teacher2.load_state_dict(t2_checkpoint)
 
-        print('test for teacher1')
-        test(test_loader, teacher1, criterion, args)
-        test_adv(test_loader, teacher1, criterion, args)
-        print('test for teacher2')                
-        test(test_loader, teacher2, criterion, args)
-        test_adv(test_loader, teacher2, criterion, args)
+    #     print('test for teacher1')
+    #     test(test_loader, teacher1, criterion, args)
+    #     test_adv(test_loader, teacher1, criterion, args)
+    #     print('test for teacher2')                
+    #     test(test_loader, teacher2, criterion, args)
+    #     test_adv(test_loader, teacher2, criterion, args)
 
     ########################## resume ##########################
     start_epoch = 0
-    if args.resume:
-        print('resume from checkpoint.pth.tar')
-        checkpoint = torch.load(os.path.join(args.save_dir, 'checkpoint.pth.tar'), map_location = torch.device('cuda:'+str(args.gpu)))
-        best_sa = checkpoint['best_sa']
-        best_ra = checkpoint['best_ra']
-        start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        scheduler.load_state_dict(checkpoint['scheduler'])
-        all_result = checkpoint['result']
+    # if args.resume:
+    #     print('resume from checkpoint.pth.tar')
+    #     checkpoint = torch.load(os.path.join(args.save_dir, 'checkpoint.pth.tar'), map_location = torch.device('cuda:'+str(args.gpu)))
+    #     best_sa = checkpoint['best_sa']
+    #     best_ra = checkpoint['best_ra']
+    #     start_epoch = checkpoint['epoch']
+    #     model.load_state_dict(checkpoint['state_dict'])
+    #     optimizer.load_state_dict(checkpoint['optimizer'])
+    #     scheduler.load_state_dict(checkpoint['scheduler'])
+    #     all_result = checkpoint['result']
 
-        if args.swa:
-            best_sa_swa = checkpoint['best_sa_swa']
-            best_ra_swa = checkpoint['best_ra_swa']
-            swa_model.load_state_dict(checkpoint['swa_state_dict'])
-            swa_n = checkpoint['swa_n']
-    else:
+    #     if args.swa:
+    #         best_sa_swa = checkpoint['best_sa_swa']
+    #         best_ra_swa = checkpoint['best_ra_swa']
+    #         swa_model.load_state_dict(checkpoint['swa_state_dict'])
+    #         swa_n = checkpoint['swa_n']
+    if True:
         all_result = {}
         all_result['train_acc'] = []
         all_result['val_sa'] = []
@@ -192,20 +231,27 @@ def main():
         print(optimizer.state_dict()['param_groups'][0]['lr'])
 
         if args.lwf and epoch >= args.lwf_start and epoch < args.lwf_end:
-            print('adversarial training with LWF')
-            train_acc = train_epoch_adv_dual_teacher(train_loader, model, teacher1, teacher2, criterion, optimizer, epoch, args)
+            # print('adversarial training with LWF')
+            # train_acc = train_epoch_adv_dual_teacher(train_loader, model, teacher1, teacher2, criterion, optimizer, epoch, args)
+            pass
         else:
             print('baseline adversarial training')
-            train_acc = train_epoch_adv(train_loader, model, criterion, optimizer, epoch, args)
+            if args.mode == 'pgd7':
+                train_acc = train_epoch_adv(train_loader, model, criterion, optimizer, epoch, args)
+            elif args.mode == 'sgd':
+                train_acc = train_epoch(train_loader, model, criterion, optimizer, epoch, args)
 
         all_result['train_acc'].append(train_acc)
         scheduler.step()
 
         ###validation###
         val_sa = test(val_loader, model, criterion, args)
-        val_ra = test_adv(val_loader, model, criterion, args)   
         test_sa = test(test_loader, model, criterion, args)
-        test_ra = test_adv(test_loader, model, criterion, args)  
+        if args.mode == 'pgd7':
+            val_ra = test_adv(val_loader, model, criterion, args)   
+            test_ra = test_adv(test_loader, model, criterion, args)  
+        else:
+            val_ra, test_ra = -1, -1
 
         all_result['val_sa'].append(val_sa)
         all_result['val_ra'].append(val_ra)
@@ -228,47 +274,49 @@ def main():
             'result': all_result
         }
 
-        if args.swa and epoch >= args.swa_start and (epoch - args.swa_start) % args.swa_c_epochs == 0:
+        # if args.swa and epoch >= args.swa_start and (epoch - args.swa_start) % args.swa_c_epochs == 0:
 
-            # SWA
-            moving_average(swa_model, model, 1.0 / (swa_n + 1))
-            swa_n += 1
-            bn_update(train_loader, swa_model)
+        #     # SWA
+        #     moving_average(swa_model, model, 1.0 / (swa_n + 1))
+        #     swa_n += 1
+        #     bn_update(train_loader, swa_model)
 
-            val_sa_swa = test(val_loader, swa_model, criterion, args)
-            val_ra_swa = test_adv(val_loader, swa_model, criterion, args)   
-            test_sa_swa = test(test_loader, swa_model, criterion, args)
-            test_ra_swa = test_adv(test_loader, swa_model, criterion, args)  
+        #     val_sa_swa = test(val_loader, swa_model, criterion, args)
+        #     val_ra_swa = test_adv(val_loader, swa_model, criterion, args)   
+        #     test_sa_swa = test(test_loader, swa_model, criterion, args)
+        #     test_ra_swa = test_adv(test_loader, swa_model, criterion, args)  
 
-            all_result['val_sa_swa'].append(val_sa_swa)
-            all_result['val_ra_swa'].append(val_ra_swa)
-            all_result['test_sa_swa'].append(test_sa_swa)
-            all_result['test_ra_swa'].append(test_ra_swa)
+        #     all_result['val_sa_swa'].append(val_sa_swa)
+        #     all_result['val_ra_swa'].append(val_ra_swa)
+        #     all_result['test_sa_swa'].append(test_sa_swa)
+        #     all_result['test_ra_swa'].append(test_ra_swa)
 
-            is_sa_best_swa = val_sa_swa  > best_sa_swa
-            best_sa_swa = max(val_sa_swa, best_sa_swa)
+        #     is_sa_best_swa = val_sa_swa  > best_sa_swa
+        #     best_sa_swa = max(val_sa_swa, best_sa_swa)
 
-            is_ra_best_swa = val_ra_swa  > best_ra_swa
-            best_ra_swa = max(val_ra_swa, best_ra_swa)
+        #     is_ra_best_swa = val_ra_swa  > best_ra_swa
+        #     best_ra_swa = max(val_ra_swa, best_ra_swa)
 
-            checkpoint_state.update({
-                'swa_state_dict': swa_model.state_dict(),
-                'swa_n': swa_n,
-                'best_sa_swa': best_sa_swa,
-                'best_ra_swa': best_ra_swa
-            })
+        #     checkpoint_state.update({
+        #         'swa_state_dict': swa_model.state_dict(),
+        #         'swa_n': swa_n,
+        #         'best_sa_swa': best_sa_swa,
+        #         'best_ra_swa': best_ra_swa
+        #     })
 
-        elif args.swa:
+        # elif args.swa:
 
-            all_result['val_sa_swa'].append(val_sa)
-            all_result['val_ra_swa'].append(val_ra)
-            all_result['test_sa_swa'].append(test_sa)
-            all_result['test_ra_swa'].append(test_ra)
+        #     all_result['val_sa_swa'].append(val_sa)
+        #     all_result['val_ra_swa'].append(val_ra)
+        #     all_result['test_sa_swa'].append(test_sa)
+        #     all_result['test_ra_swa'].append(test_ra)
 
         checkpoint_state.update({
             'result': all_result
         })
         save_checkpoint(checkpoint_state, is_sa_best, is_ra_best, is_sa_best_swa, is_ra_best_swa, args.save_dir)
+
+        log(model, val_sa, val_ra, test_sa, test_ra, epoch, args)
 
         plt.plot(all_result['train_acc'], label='train_acc')
         plt.plot(all_result['test_sa'], label='SA')
