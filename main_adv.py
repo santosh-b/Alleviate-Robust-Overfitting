@@ -20,6 +20,8 @@ parser = argparse.ArgumentParser(description='PyTorch Adversarial Training')
 parser.add_argument('--mode', type=str, default=None)
 parser.add_argument('--eb', type=str, default=None)
 
+parser.add_argument('--eb_path', type=str, default=None)
+
 ########################## data setting ##########################
 parser.add_argument('--data', type=str, default='data/cifar10', help='location of the data corpus', required=True)
 parser.add_argument('--dataset', type=str, default='cifar10', help='dataset [cifar10, cifar100, tinyimagenet]', required=True)
@@ -95,23 +97,25 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
         if epoch % 10 == 0:
             torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
         if (not eb30_found) and eb30.early_bird_emerge(model):
-            print('[Early Bird] Found an EB30 Ticket @',log_info['epoch'])
+            print('[Early Bird] Found an EB30 Ticket @',epoch)
             eb30_found = True
             torch.save(model.state_dict(), log_folder+'/eb30.pt')
             with open(log_folder+'/find_eb.txt','a') as f:
-                f.write(f'Found EB30 Ticket @ {log_info["epoch"]} \n')
+                f.write(f'Found EB30 Ticket @ {epoch} \n')
         if (not eb50_found) and eb50.early_bird_emerge(model):
-            print('[Early Bird] Found an EB50 Ticket @',log_info['epoch'])
+            print('[Early Bird] Found an EB50 Ticket @',epoch)
             eb50_found = True
             torch.save(model.state_dict(), log_folder+'/eb50.pt')
             with open(log_folder+'/find_eb.txt','a') as f:
-                f.write(f'Found EB50 Ticket @ {log_info["epoch"]} \n')
+                f.write(f'Found EB50 Ticket @ {epoch} \n')
         if (not eb70_found) and eb70.early_bird_emerge(model):
-            print('[Early Bird] Found an EB70 Ticket @',log_info['epoch'])
+            print('[Early Bird] Found an EB70 Ticket @',epoch)
             eb70_found = True
             torch.save(model.state_dict(), log_folder+'/eb70.pt')
             with open(log_folder+'/find_eb.txt','a') as f:
-                f.write(f'Found EB70 Ticket @ {log_info["epoch"]} \n')
+                f.write(f'Found EB70 Ticket @ {epoch} \n')
+        if eb30_found and eb50_found and eb70_found and args.arch != 'resnet18':
+            exit()
 
 def main():
 
@@ -140,13 +144,57 @@ def main():
     elif dataset == 'cifar100':
         num_classes=100
         train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
-
-    if args.arch == 'vgg16':
-        model = vgg(16, dataset=args.dataset, seed=0).cuda()
-    if args.arch == 'resnet18':
-        model = resnet18(seed=0, num_classes=num_classes).cuda()
-    if args.arch == 'resnet50':
-        model = resnet50_official(seed=0, num_classes=num_classes).cuda()
+    if args.eb_path is None:
+        if args.arch == 'vgg16':
+            model = vgg(16, dataset=args.dataset, seed=0).cuda()
+        if args.arch == 'resnet18':
+            model = resnet18(seed=0, num_classes=num_classes).cuda()
+        if args.arch == 'resnet50':
+            model = resnet50_official(seed=0, num_classes=num_classes).cuda()
+    else:
+        if 'eb50' in args.eb_path:
+            pct = .5
+        elif 'eb30' in args.eb_path:
+            pct =.3
+        elif 'eb70' in args.eb_path:
+            pct = .7
+        weight_before_prune = torch.load(args.eb_path)
+        if args.arch == 'resnet18':
+            if dataset == 'cifar10':
+                model = resnet18(seed=0, num_classes=10)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar10')
+            elif dataset == 'cifar100':
+                model = resnet18(seed=0, num_classes=100)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar100')
+            model = initial_weights.cuda()
+        elif args.arch == 'resnet50':
+            if dataset == 'cifar10':
+                model = resnet50_official(seed=0, num_classes=10)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'cifar10')
+            elif dataset == 'cifar100':
+                model = resnet50_official(seed=0, num_classes=100)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'cifar100')
+            model = initial_weights.cuda()
+        elif args.arch == 'vgg16':
+            if dataset == 'cifar10':
+                model = vgg(16, seed=0, dataset='cifar10')
+                model.load_state_dict(weight_before_prune)
+                cfg = vggprune(model.cuda(), pct)
+                initial_weights, mask = get_pruned_init(model, cfg, pct, 'cifar10')
+            elif dataset == 'cifar100':
+                model = vgg(16, seed=0, dataset='cifar10')
+                model.load_state_dict(weight_before_prune)
+                cfg = vggprune(model.cuda(), pct)
+                initial_weights, mask = get_pruned_init(model, cfg, pct, 'cifar100')
+            model = initial_weights.cuda()
 
     ########################## optimizer and scheduler ##########################
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
