@@ -89,7 +89,7 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
                 str(val_ra)+'\n')
     if epoch == 109:
         torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
-    if bool(args.eb):
+    if args.eb == 'True':
         global eb30_found, eb50_found, eb70_found
         global eb30, eb50, eb70
         if epoch % 10 == 0:
