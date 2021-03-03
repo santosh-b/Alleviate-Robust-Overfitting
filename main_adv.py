@@ -88,29 +88,29 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
                 str(val_sa)+' '+
                 str(val_ra)+'\n')
     if epoch == 109:
-        torch.save(model.state_dict(), 'store/'+args.save+f'/{epoch}_checkpoint.pt')
+        torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
     if bool(args.eb):
         global eb30_found, eb50_found, eb70_found
         global eb30, eb50, eb70
         if epoch % 10 == 0:
-            torch.save(model.state_dict(), 'store/'+log_folder+f'/{epoch}_checkpoint.pt')
+            torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
         if (not eb30_found) and eb30.early_bird_emerge(model):
             print('[Early Bird] Found an EB30 Ticket @',log_info['epoch'])
             eb30_found = True
-            torch.save(model.state_dict(), 'store/'+log_folder+'/eb30.pt')
-            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+            torch.save(model.state_dict(), log_folder+'/eb30.pt')
+            with open(log_folder+'/find_eb.txt','a') as f:
                 f.write(f'Found EB30 Ticket @ {log_info["epoch"]} \n')
         if (not eb50_found) and eb50.early_bird_emerge(model):
             print('[Early Bird] Found an EB50 Ticket @',log_info['epoch'])
             eb50_found = True
-            torch.save(model.state_dict(), 'store/'+log_folder+'/eb50.pt')
-            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+            torch.save(model.state_dict(), log_folder+'/eb50.pt')
+            with open(log_folder+'/find_eb.txt','a') as f:
                 f.write(f'Found EB50 Ticket @ {log_info["epoch"]} \n')
         if (not eb70_found) and eb70.early_bird_emerge(model):
             print('[Early Bird] Found an EB70 Ticket @',log_info['epoch'])
             eb70_found = True
-            torch.save(model.state_dict(), 'store/'+log_folder+'/eb70.pt')
-            with open('store/'+log_folder+'/find_eb.txt','a') as f:
+            torch.save(model.state_dict(), log_folder+'/eb70.pt')
+            with open(log_folder+'/find_eb.txt','a') as f:
                 f.write(f'Found EB70 Ticket @ {log_info["epoch"]} \n')
 
 def main():
