@@ -73,6 +73,12 @@ parser.add_argument('--temperature', type=float, default=2.0, help='temperature 
 parser.add_argument('--lwf_start', type=int, default=0, metavar='N', help='start point of lwf (default: 200)')
 parser.add_argument('--lwf_end', type=int, default=200, metavar='N', help='end point of lwf (default: 200)')
 
+eb30 = EarlyBird(0.3)
+eb30_found = False
+eb50 = EarlyBird(0.5)
+eb50_found = False
+eb70 = EarlyBird(0.7)
+eb70_found = False
 def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
     with open(str(args.save_dir)+'/log.txt', 'a') as f:
         f.write(str(epoch)+' '+
@@ -101,6 +107,7 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
             torch.save(model.state_dict(), 'store/'+log_folder+'/eb70.pt')
             with open('store/'+log_folder+'/find_eb.txt','a') as f:
                 f.write(f'Found EB70 Ticket @ {log_info["epoch"]} \n')
+
 
 def main():
 
