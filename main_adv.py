@@ -80,6 +80,7 @@ eb50_found = False
 eb70 = EarlyBird(0.7)
 eb70_found = False
 def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
+    log_folder = args.save_dir
     with open(str(args.save_dir)+'/log.txt', 'a') as f:
         f.write(str(epoch)+' '+
                 str(test_sa)+' '+
@@ -87,7 +88,7 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
                 str(val_sa)+' '+
                 str(val_ra)+'\n')
     if epoch == 109:
-        torch.save(model.state_dict(), 'store/'+log_folder+f'/{epoch}_checkpoint.pt')
+        torch.save(model.state_dict(), 'store/'+args.save+f'/{epoch}_checkpoint.pt')
     if bool(args.eb):
         global eb30_found, eb50_found, eb70_found
         global eb30, eb50, eb70
