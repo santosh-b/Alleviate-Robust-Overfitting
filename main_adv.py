@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import torchvision.models as models
 from utils import *
 import torchvision.transforms as transforms
+from autoattack import AutoAttack
 
 parser = argparse.ArgumentParser(description='PyTorch Adversarial Training')
 
@@ -21,6 +22,7 @@ parser.add_argument('--mode', type=str, default=None)
 parser.add_argument('--eb', type=str, default=None)
 
 parser.add_argument('--eb_path', type=str, default=None)
+parser.add_argument('--grad_align_cos_lambda', type=float, default=None)
 
 ########################## data setting ##########################
 parser.add_argument('--data', type=str, default='data/cifar10', help='location of the data corpus', required=True)
@@ -141,8 +143,10 @@ def main():
     if dataset == 'cifar10':
         num_classes=10
         train_loader, val_loader, test_loader = cifar10_dataloaders(data_dir=args.data)
+        item = datasets.CIFAR10(root='cifar', train=False, transform=transform_chain, download=True)
     elif dataset == 'cifar100':
         num_classes=100
+        item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
     if args.eb_path is None:
         if args.arch == 'vgg16':
@@ -199,10 +203,12 @@ def main():
     ########################## optimizer and scheduler ##########################
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
+    lr = args.lr if args.mode != 'fast' else 0.2
+    optimizer = torch.optim.SGD(model.parameters(), lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=decreasing_lr, gamma=0.1)
+    if args.mode != 'fast':
+    	scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=decreasing_lr, gamma=0.1)
 
 
     ######################### only evaluation ###################################
@@ -299,14 +305,18 @@ def main():
                 train_acc = train_epoch_adv(train_loader, model, criterion, optimizer, epoch, args)
             elif args.mode == 'sgd':
                 train_acc = train_epoch(train_loader, model, criterion, optimizer, epoch, args)
+            elif args.mode == 'fast':
+            	lr_schedule = get_lr_schedule('cyclic', 110, .2)
+            	train_acc = train_epoch_fast(train_loader, model, criterion, optimizer, epoch, lr_schedule, args)
 
         all_result['train_acc'].append(train_acc)
-        scheduler.step()
+        if args.mode != 'fast':
+            scheduler.step()
 
         ###validation###
         val_sa = test(val_loader, model, criterion, args)
         test_sa = test(test_loader, model, criterion, args)
-        if args.mode == 'pgd7':
+        if args.mode != 'sgd':
             val_ra = test_adv(val_loader, model, criterion, args)   
             test_ra = test_adv(test_loader, model, criterion, args)  
         else:
@@ -323,15 +333,25 @@ def main():
         is_ra_best = val_ra  > best_ra
         best_ra = max(val_ra, best_ra)
 
-        checkpoint_state = {
-            'best_sa': best_sa,
-            'best_ra': best_ra,
-            'epoch': epoch+1,
-            'state_dict': model.state_dict(),
-            'optimizer': optimizer.state_dict(),
-            'scheduler': scheduler.state_dict(),
-            'result': all_result
-        }
+        if args.mode == 'fast':
+            checkpoint_state = {
+                'best_sa': best_sa,
+                'best_ra': best_ra,
+                'epoch': epoch+1,
+                'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'result': all_result
+            }
+        else:
+            checkpoint_state = {
+                'best_sa': best_sa,
+                'best_ra': best_ra,
+                'epoch': epoch+1,
+                'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict(),
+                'scheduler': scheduler.state_dict(),
+                'result': all_result
+            }
 
         # if args.swa and epoch >= args.swa_start and (epoch - args.swa_start) % args.swa_c_epochs == 0:
 
@@ -388,6 +408,23 @@ def main():
         plt.legend()
         plt.savefig(os.path.join(args.save_dir, 'net_train.png'))
         plt.close()
+
+    model = model.eval()
+    test_loader = data.DataLoader(item, batch_size=128, shuffle=False, num_workers=0)
+
+    logger = str(args.save_dir)+'/AA_eval-new.txt'
+    model = model.cuda()
+    adversary = AutoAttack(model, norm='Linf', eps=8/255, log_path=logger,version='standard')
+    adversary.attacks_to_run = ['apgd-t']
+    l = [x for (x, y) in test_loader]
+    x_test = torch.cat(l, 0).cuda()
+    l = [y for (x, y) in test_loader]
+    y_test = torch.cat(l, 0).cuda()
+    adv_complete = adversary.run_standard_evaluation(x_test, y_test,bs=128)
+    print(adv_complete)
+    torch.save({'adv_complete': adv_complete}, '{}/{}_{}_1_{}_eps_{:.5f}.pth'.format(
+    args.save_dir, 'aa', 'standard', adv_complete.shape[0], 8/255))
+
 
 
 if __name__ == '__main__':
