@@ -155,8 +155,8 @@ def main():
     elif dataset == 'tiny':
         num_classes = 200
         train_loader, val_loader, test_loader = tiny_imagenet_dataloaders(data_dir=args.data)
-        test_dir = os.path.join(args.data, 'validation/')
-        item = datasets.ImageFolder(test_dir, transform=transform_chain)
+        # test_dir = os.path.join(args.data, 'validation/')
+        # item = datasets.ImageFolder(test_dir, transform=transform_chain)
 
     # =========================== MODEL ========================================================================
 
@@ -227,7 +227,7 @@ def main():
             model = initial_weights.cuda()
 
     # multi GPU
-    model = nn.DataParallel(model).cuda()
+    # model = nn.DataParallel(model).cuda()
 
     ########################## optimizer and scheduler ##########################
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))

@@ -61,6 +61,7 @@ torch.manual_seed(args.seed)
 device = torch.device("cuda" if use_cuda else "cpu")
 kwargs = {'num_workers': 1, 'pin_memory': True} if use_cuda else {}
 
+# ============================================== DATASET =======================================================
 # setup data loader
 transform_train = transforms.Compose([
     transforms.ToTensor(),
@@ -74,11 +75,19 @@ if args.dataset == 'cifar10':
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
     testset = torchvision.datasets.CIFAR10(root='cifar', train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
 elif args.dataset == 'cifar100':
     trainset = torchvision.datasets.CIFAR100(root='cifar100', train=True, download=True, transform=transform_train)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
     testset = torchvision.datasets.CIFAR100(root='cifar100', train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
+elif args.dataset == 'tiny':
+    trainset = torchvision.datasets.ImageFolder('tiny-imagenet/training', transform=transform_train)
+    testset = torchvision.datasets.ImageFolder('tiny-imagenet/validation', transform=transform_test)
+    train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
+    test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
+
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
@@ -159,22 +168,31 @@ def adjust_learning_rate(optimizer, epoch):
 
 def main():
     global args
+    # ============================================== MODEL =======================================================
+
     # init model, ResNet18() can be also used here for training
     if args.model == 'resnet18':
         if args.dataset == 'cifar10':
             model = resnet18(seed=0, num_classes=10).cuda()
         elif args.dataset == 'cifar100':
             model = resnet18(seed=0, num_classes=100).cuda()
+        elif args.dataset == 'tiny':
+            model = resnet18(seed=0, num_classes=200).cuda()
+
     elif args.model == 'resnet50':
         if args.dataset == 'cifar10':
             model = resnet50_official(seed=0, num_classes=10).cuda()
         elif args.dataset == 'cifar100':
             model = resnet50_official(seed=0, num_classes=100).cuda()
+        elif args.dataset =='tiny':
+            model = resnet50_official(seed=0, num_classes=200).cuda()
+
     elif args.model == 'vgg16':
         if args.dataset == 'cifar10':
             model = vgg(16, seed=0, dataset='cifar10').cuda()
         elif args.dataset == 'cifar100':
             model = vgg(16, seed=0, dataset='cifar100').cuda()
+
     optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
     with open(model_dir+'/log.txt','a') as f:
         f.write('epoch | test_acc | train_acc\n')
