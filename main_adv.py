@@ -145,10 +145,10 @@ def main():
     if dataset == 'cifar10':
         num_classes=10
         train_loader, val_loader, test_loader = cifar10_dataloaders(data_dir=args.data)
-        item = datasets.CIFAR10(root='cifar', train=False, transform=transform_chain, download=True)
+        #item = datasets.CIFAR10(root='cifar', train=False, transform=transform_chain, download=True)
     elif dataset == 'cifar100':
         num_classes=100
-        item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
+        #item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
     if args.eb_path is None:
         if args.arch == 'vgg16':
