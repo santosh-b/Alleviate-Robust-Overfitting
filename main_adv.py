@@ -140,6 +140,7 @@ def main():
         print('set random seed = ', args.seed)
         setup_seed(args.seed)
 
+    # ============================ DATASET =====================================================================
     transform_list = [transforms.ToTensor()]
     transform_chain = transforms.Compose(transform_list)
     if dataset == 'cifar10':
@@ -150,6 +151,15 @@ def main():
         num_classes=100
         #item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
+
+    elif dataset == 'tiny':
+        num_classes = 200
+        train_loader, val_loader, test_loader = tiny_imagenet_dataloaders(data_dir=args.data)
+        test_dir = os.path.join(args.data, 'validation/')
+        item = datasets.ImageFolder(test_dir, transform=transform_chain)
+
+    # =========================== MODEL ========================================================================
+
     if args.eb_path is None:
         if args.arch == 'vgg16':
             model = vgg(16, dataset=args.dataset, seed=0).cuda()
@@ -158,6 +168,7 @@ def main():
         if args.arch == 'resnet50':
             model = resnet50_official(seed=0, num_classes=num_classes).cuda()
     else:
+        # ===================== get pruned model =====================
         print(args.save_dir)
         if 'eb50' in args.eb_path or 'eb50' in args.save_dir:
             pct = .5
@@ -165,7 +176,7 @@ def main():
             pct =.3
         elif 'eb70' in args.eb_path or 'eb70' in args.save_dir:
             pct = .7
-        weight_before_prune = torch.load(args.eb_path)
+        weight_before_prune = torch.load(args.eb_path)      # early-bird tickets (dense model)
         if args.arch == 'resnet18':
             if dataset == 'cifar10':
                 model = resnet18(seed=0, num_classes=10)
@@ -177,7 +188,13 @@ def main():
                 model.load_state_dict(weight_before_prune)
                 cfg = resprune(model.cuda(), pct)
                 initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar100')
+            elif dataset == 'tiny':
+                model = resnet18(seed=0, num_classes=200)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'tiny')
             model = initial_weights.cuda()
+
         elif args.arch == 'resnet50':
             if dataset == 'cifar10':
                 model = resnet50_official(seed=0, num_classes=10)
@@ -189,7 +206,13 @@ def main():
                 model.load_state_dict(weight_before_prune)
                 cfg = resprune(model.cuda(), pct)
                 initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'cifar100')
+            elif dataset == 'tiny':
+                model = resnet50_official(seed=0, num_classes=200)
+                model.load_state_dict(weight_before_prune)
+                cfg = resprune(model.cuda(), pct)
+                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'tiny')
             model = initial_weights.cuda()
+
         elif args.arch == 'vgg16':
             if dataset == 'cifar10':
                 model = vgg(16, seed=0, dataset='cifar10')
@@ -202,6 +225,9 @@ def main():
                 cfg = vggprune(model.cuda(), pct)
                 initial_weights, mask = get_pruned_init(model, cfg, pct, 'cifar100')
             model = initial_weights.cuda()
+
+    # multi GPU
+    model = nn.DataParallel(model).cuda()
 
     ########################## optimizer and scheduler ##########################
     decreasing_lr = list(map(int, args.decreasing_lr.split(',')))

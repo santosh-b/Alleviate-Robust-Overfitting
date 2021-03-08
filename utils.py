@@ -523,6 +523,86 @@ def train_epoch_adv(train_loader, model, criterion, optimizer, epoch, args):
 
     return top1.avg
 
+
+
+# Teacher free KD ==============================
+def loss_kd_regularization(outputs, labels, params):
+    """
+    loss function for mannually-designed regularization: Tf-KD_{reg}
+    """
+    alpha = params.reg_alpha
+    T = params.reg_temperature
+    correct_prob = 0.99    # the probability for correct class in u(k)
+    loss_CE = F.cross_entropy(outputs, labels)
+    K = outputs.size(1)
+
+    teacher_soft = torch.ones_like(outputs).cuda()
+    teacher_soft = teacher_soft*(1-correct_prob)/(K-1)  # p^d(k)
+    for i in range(outputs.shape[0]):
+        teacher_soft[i ,labels[i]] = correct_prob
+    loss_soft_regu = nn.KLDivLoss(reduction='batchmean')(F.log_softmax(outputs, dim=1), F.softmax(teacher_soft/T, dim=1))
+
+    KD_loss = (1. - alpha)*loss_CE + alpha*loss_soft_regu
+
+    return KD_loss
+
+
+def train_epoch_adv_tfkd(train_loader, model, criterion, optimizer, epoch, args):
+    losses = AverageMeter()
+    top1 = AverageMeter()
+
+    if args.norm == 'linf':
+        adversary = LinfPGDAttack(
+            model, loss_fn=criterion, eps=args.train_eps, nb_iter=args.train_step, eps_iter=args.train_gamma,
+            rand_init=args.train_randinit, clip_min=0.0, clip_max=1.0, targeted=False
+        )
+    elif args.norm == 'l2':
+        adversary = L2PGDAttack(
+            model, loss_fn=criterion, eps=args.train_eps, nb_iter=args.train_step, eps_iter=args.train_gamma,
+            rand_init=args.train_randinit, clip_min=0.0, clip_max=1.0, targeted=False
+        )
+
+    model.train()
+    start = time.time()
+    for i, (input, target) in enumerate(train_loader):
+
+        input = input.cuda()
+        target = target.cuda()
+
+        # adv samples
+        with ctx_noparamgrad(model):
+            input_adv = adversary.perturb(input, target)
+
+        # compute output
+        output_adv = model(input_adv)
+        loss = loss_kd_regularization(output_adv, target, args)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        output = output_adv.float()
+        loss = loss.float()
+        # measure accuracy and record loss
+        prec1 = accuracy(output.data, target)[0]
+
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+
+        if i % args.print_freq == 0:
+            end = time.time()
+            print('Epoch: [{0}][{1}/{2}]\t'
+                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                  'Accuracy {top1.val:.3f} ({top1.avg:.3f})\t'
+                  'Time {3:.2f}'.format(
+                epoch, i, len(train_loader), end - start, loss=losses, top1=top1))
+            start = time.time()
+
+    print('train_accuracy {top1.avg:.3f}'.format(top1=top1))
+
+    return top1.avg
+
+
 def train_epoch_adv_dual_teacher(train_loader, model, teacher1, teacher2, criterion, optimizer, epoch, args):
     
     losses = AverageMeter()
@@ -1069,6 +1149,10 @@ def get_resnet_pruned_init(model, cfg, pct, dataset):
         modelnew = resnet18(seed=0, num_classes=100, cfg=cfg)
         model.cuda()
         modelnew.cuda()
+    elif dataset == 'tiny':
+        modelnew = resnet18(seed=0, num_classes=200, cfg=cfg)
+        model.cuda()
+        modelnew.cuda()
 
     total = 0
     for m in model.modules():
@@ -1119,6 +1203,8 @@ def get_resnet_pruned_init(model, cfg, pct, dataset):
         model = resnet18(seed=0, num_classes=10)
     elif dataset == 'cifar100':
         model = resnet18(seed=0, num_classes=100)
+    elif dataset == 'tiny':
+        model = resnet18(seed=0, num_classes=200)
     model.cuda()
 
     old_modules = list(model.modules())
@@ -1384,7 +1470,8 @@ class ResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
+        # x = self.avgpool(x)
+        x = F.adaptive_avg_pool2d(x, output_size=(1, 1))  # make it suitable for 64 * 64 input (TinyImageNet)
         latent = x.view(x.size(0), -1)
         y = self.fc(latent)
         if with_latent:
@@ -1510,7 +1597,8 @@ class ResNet50(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
-        x = self.avgpool(x)
+        # x = self.avgpool(x)
+        x = F.adaptive_avg_pool2d(x, output_size=(1, 1))  # make it suitable for 64 * 64 input (TinyImageNet)
         latent = x.view(x.size(0), -1)
         y = self.fc(latent)
         if with_latent:
@@ -1587,6 +1675,10 @@ def get_resnet50_pruned_init(model, cfg, pct, dataset):
         modelnew = resnet50_official(seed=0, num_classes=100, cfg=cfg)
         model.cuda()
         modelnew.cuda()
+    elif dataset == 'tiny':
+        modelnew = resnet50_official(seed=0, num_classes=200, cfg=cfg)
+        model.cuda()
+        modelnew.cuda()
 
     total = 0
     for m in model.modules():
@@ -1637,6 +1729,8 @@ def get_resnet50_pruned_init(model, cfg, pct, dataset):
         model = resnet50_official(seed=0, num_classes=10)
     elif dataset == 'cifar100':
         model = resnet50_official(seed=0, num_classes=100)
+    elif dataset == 'tiny':
+        model = resnet50_official(seed=0, num_classes=200)
     model.cuda()
 
     old_modules = list(model.modules())
@@ -2141,6 +2235,46 @@ def avg_fraction_same_sign(v1, v2):
 def l2_norm_batch(v):
     norms = (v ** 2).sum([1, 2, 3]) ** 0.5
     return norms
+
+
+def eval_adv(val_loader, model, criterion, n_step):
+    """
+    Run adversarial evaluation
+    """
+    losses = AverageMeter()
+    top1 = AverageMeter()
+
+    adversary = LinfPGDAttack(
+        model, loss_fn=criterion, eps=8/255, nb_iter=n_step, eps_iter=2/255,
+        rand_init=False, clip_min=0.0, clip_max=1.0, targeted=False
+    )
+
+    model.eval()
+    start = time.time()
+    for i, (input, target) in enumerate(val_loader):
+
+        input = input.cuda()
+        target = target.cuda()
+
+        #adv samples
+        input_adv = adversary.perturb(input, target)
+        # compute output
+        with torch.no_grad():
+            output = model(input_adv)
+            loss = criterion(output, target)
+
+        output = output.float()
+        loss = loss.float()
+
+        # measure accuracy and record loss
+        prec1 = accuracy(output.data, target)[0]
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+
+
+    print('Robust Accuracy {top1.avg:.3f}'.format(top1=top1))
+
+    return top1.avg
 
 
 def initialize_weights(module):
