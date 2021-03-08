@@ -23,6 +23,7 @@ aa_eval = True if aa_eval == 'True' else False
 is_pruned = True if unpruned_eb != final_weights else False
 pct = float(pct)
 
+# =============================================== Tickets ==============================================================
 if is_pruned:
     weight_before_prune = fix_robustness_ckpt(torch.load(unpruned_eb))
     if model_type == 'resnet18':
@@ -36,6 +37,10 @@ if is_pruned:
             cfg = resprune(model.cuda(), pct)
             os.system('pip install cifar2png')
             os.system('cifar2png cifar100 cifar100')
+        elif dataset == 'tiny':
+            model = resnet18(seed=0, num_classes=200)
+            model.load_state_dict(weight_before_prune, strict=False)
+            cfg = resprune(model.cuda(), pct)
 
     if model_type == 'resnet50':
         if dataset == 'cifar10':
@@ -43,11 +48,15 @@ if is_pruned:
             model.load_state_dict(weight_before_prune, strict=False)
             cfg = resprune(model.cuda(), pct)
         elif dataset == 'cifar100':
-            model = resnet50_officla(seed=0, num_classes=100)
+            model = resnet50_official(seed=0, num_classes=100)
             model.load_state_dict(weight_before_prune, strict=False)
             cfg = resprune(model.cuda(), pct)
             os.system('pip install cifar2png')
             os.system('cifar2png cifar100 cifar100')
+        elif dataset == 'tiny':
+            model = resnet50_official(seed=0, num_classes=200)
+            model.load_state_dict(weight_before_prune, strict=False)
+            cfg = resprune(model.cuda(), pct)
 
     if model_type == 'vgg16':
         if dataset == 'cifar10':
@@ -61,6 +70,7 @@ if is_pruned:
 else:
     cfg=None
 
+# =============================================== Dataset / Model ======================================================
 transform_list = [transforms.ToTensor()]
 transform_chain = transforms.Compose(transform_list)
 print('DATASET',dataset)
@@ -75,6 +85,13 @@ if model_type == 'resnet50':
         model.load_state_dict(fix_robustness_ckpt(torch.load(final_weights)), strict=False)
         item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         _, _, test_loader = cifar100_dataloaders(data_dir='cifar100')
+    elif dataset == 'tiny':
+        model = resnet50_official(num_classes=200, cfg=cfg, seed=0)
+        model.load_state_dict(fix_robustness_ckpt(torch.load(final_weights)), strict=False)
+        test_dir = 'tiny-imagenet/validation/'
+        item = datasets.ImageFolder(test_dir, transform=transform_chain)
+        _, _, test_loader = tiny_imagenet_dataloaders(data_dir='tiny-imagenet')
+
 elif model_type == 'resnet18':
     if dataset == 'cifar10':
         model = resnet18(num_classes=10, cfg=cfg, seed=0)
@@ -86,6 +103,13 @@ elif model_type == 'resnet18':
         model.load_state_dict(fix_robustness_ckpt(torch.load(final_weights)), strict=False)
         item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         _, _, test_loader = cifar100_dataloaders(data_dir='cifar100')
+    elif dataset == 'tiny':
+        model = resnet18(num_classes=200, cfg=cfg, seed=0)
+        model.load_state_dict(fix_robustness_ckpt(torch.load(final_weights)), strict=False)
+        test_dir = 'tiny-imagenet/validation/'
+        item = datasets.ImageFolder(test_dir, transform=transform_chain)
+        _, _, test_loader = tiny_imagenet_dataloaders(data_dir='tiny-imagenet')
+
 elif model_type == 'vgg16':
     if dataset == 'cifar10':
         model = vgg(16, dataset='cifar10', cfg=cfg, seed=0)
@@ -97,7 +121,11 @@ elif model_type == 'vgg16':
         model.load_state_dict(fix_robustness_ckpt(torch.load(final_weights)), strict=False)
         item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
         _, _, test_loader = cifar100_dataloaders(data_dir='cifar100')
+
 model = model.cuda()
+# model = nn.DataParallel(model).cuda()
+
+# =============================================== AA EVAL ==============================================================
 ## AA EVAL ##
 
 if aa_eval:
@@ -122,6 +150,7 @@ if aa_eval:
 
 criterion = nn.CrossEntropyLoss()
 
+# =============================================== PGD20 EVAL ===========================================================
 # ## PGD20 EVAL ##
 
 pgd20 = eval_adv(test_loader, model, criterion, 20)
