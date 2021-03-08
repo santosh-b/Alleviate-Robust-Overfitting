@@ -91,6 +91,8 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
                 str(test_ra)+' '+
                 str(val_sa)+' '+
                 str(val_ra)+'\n')
+    if args.mode == 'fast' and epoch >= 105:
+        torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
     if epoch == 109:
         torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
     if args.eb == 'True':
@@ -156,11 +158,12 @@ def main():
         if args.arch == 'resnet50':
             model = resnet50_official(seed=0, num_classes=num_classes).cuda()
     else:
-        if 'eb50' in args.eb_path:
+        print(args.save_dir)
+        if 'eb50' in args.eb_path or 'eb50' in args.save_dir:
             pct = .5
-        elif 'eb30' in args.eb_path:
+        elif 'eb30' in args.eb_path or 'eb30' in args.save_dir:
             pct =.3
-        elif 'eb70' in args.eb_path:
+        elif 'eb70' in args.eb_path or 'eb70' in args.save_dir:
             pct = .7
         weight_before_prune = torch.load(args.eb_path)
         if args.arch == 'resnet18':
@@ -409,21 +412,21 @@ def main():
         plt.savefig(os.path.join(args.save_dir, 'net_train.png'))
         plt.close()
 
-    model = model.eval()
-    test_loader = data.DataLoader(item, batch_size=128, shuffle=False, num_workers=0)
+    # model = model.eval()
+    # test_loader = data.DataLoader(item, batch_size=128, shuffle=False, num_workers=0)
 
-    logger = str(args.save_dir)+'/AA_eval-new.txt'
-    model = model.cuda()
-    adversary = AutoAttack(model, norm='Linf', eps=8/255, log_path=logger,version='standard')
-    adversary.attacks_to_run = ['apgd-t']
-    l = [x for (x, y) in test_loader]
-    x_test = torch.cat(l, 0).cuda()
-    l = [y for (x, y) in test_loader]
-    y_test = torch.cat(l, 0).cuda()
-    adv_complete = adversary.run_standard_evaluation(x_test, y_test,bs=128)
-    print(adv_complete)
-    torch.save({'adv_complete': adv_complete}, '{}/{}_{}_1_{}_eps_{:.5f}.pth'.format(
-    args.save_dir, 'aa', 'standard', adv_complete.shape[0], 8/255))
+    # logger = str(args.save_dir)+'/AA_eval-new.txt'
+    # model = model.cuda()
+    # adversary = AutoAttack(model, norm='Linf', eps=8/255, log_path=logger,version='standard')
+    # adversary.attacks_to_run = ['apgd-t']
+    # l = [x for (x, y) in test_loader]
+    # x_test = torch.cat(l, 0).cuda()
+    # l = [y for (x, y) in test_loader]
+    # y_test = torch.cat(l, 0).cuda()
+    # adv_complete = adversary.run_standard_evaluation(x_test, y_test,bs=128)
+    # print(adv_complete)
+    # torch.save({'adv_complete': adv_complete}, '{}/{}_{}_1_{}_eps_{:.5f}.pth'.format(
+    # args.save_dir, 'aa', 'standard', adv_complete.shape[0], 8/255))
 
 
 
