@@ -91,7 +91,7 @@ def log(model, val_sa, val_ra, test_sa, test_ra, epoch, args):
                 str(test_ra)+' '+
                 str(val_sa)+' '+
                 str(val_ra)+'\n')
-    if args.mode == 'fast' and epoch >= 105:
+    if args.mode == 'fast' and epoch >= 90:
         torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
     if epoch == 109:
         torch.save(model.state_dict(), log_folder+f'/{epoch}_checkpoint.pt')
