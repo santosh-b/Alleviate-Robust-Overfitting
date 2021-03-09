@@ -1859,7 +1859,10 @@ def train_epoch_fast(train_loader, model, criterion, optimizer, epoch, lr_schedu
         argmax_delta = eps * sign(grad)
 
         n_alpha_warmup_epochs = 5
-        dataset_size = 50000 if (args.dataset == 'cifar10' or args.dataset == 'cifar100') else None
+	if args.dataset == 'cifar10' or args.dataset == 'cifar100':
+		dataset_size = 50000
+	if args.dataset == 'tiny':
+		dataset_size = 100000
         n_iterations_max_alpha = n_alpha_warmup_epochs * dataset_size // args.batch_size
         fgsm_alpha = 2 # maybe 1.25?
         delta.data = clamp(delta.data + fgsm_alpha * argmax_delta, -eps, eps)
