@@ -94,7 +94,7 @@ def cifar100_dataloaders(batch_size=64, data_dir = 'datasets/cifar100'):
     return train_loader, val_loader, test_loader
 
 
-def tiny_imagenet_dataloaders(batch_size=64, data_dir = 'datasets/tiny-imagenet-200', permutation_seed=10):
+def tiny_imagenet_dataloaders(batch_size=32, data_dir = 'datasets/tiny-imagenet-200', permutation_seed=10):
 
     train_transform = transforms.Compose([
         transforms.RandomCrop(64, padding=4),
