@@ -71,20 +71,20 @@ transform_test = transforms.Compose([
 ])
 
 if args.dataset == 'cifar10':
-    trainset = torchvision.datasets.CIFAR10(root='cifar', train=True, download=True, transform=transform_train)
+    trainset = torchvision.datasets.CIFAR10(root=args.data, train=True, download=True, transform=transform_train)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
-    testset = torchvision.datasets.CIFAR10(root='cifar', train=False, download=True, transform=transform_test)
+    testset = torchvision.datasets.CIFAR10(root=args.data, train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 elif args.dataset == 'cifar100':
-    trainset = torchvision.datasets.CIFAR100(root='cifar100', train=True, download=True, transform=transform_train)
+    trainset = torchvision.datasets.CIFAR100(root=args.data, train=True, download=True, transform=transform_train)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
-    testset = torchvision.datasets.CIFAR100(root='cifar100', train=False, download=True, transform=transform_test)
+    testset = torchvision.datasets.CIFAR100(root=args.data, train=False, download=True, transform=transform_test)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
 elif args.dataset == 'tiny':
-    trainset = torchvision.datasets.ImageFolder('tiny-imagenet/training', transform=transform_train)
-    testset = torchvision.datasets.ImageFolder('tiny-imagenet/validation', transform=transform_test)
+    trainset = torchvision.datasets.ImageFolder(args.data, transform=transform_train)
+    testset = torchvision.datasets.ImageFolder(args.data, transform=transform_test)
     train_loader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, **kwargs)
     test_loader = torch.utils.data.DataLoader(testset, batch_size=args.test_batch_size, shuffle=False, **kwargs)
 
