@@ -93,6 +93,53 @@ def cifar100_dataloaders(batch_size=64, data_dir = 'datasets/cifar100'):
 
     return train_loader, val_loader, test_loader
 
+def eval_adv(val_loader, model, criterion, n_step):
+    """
+    Run adversarial evaluation
+    """
+    losses = AverageMeter()
+    top1 = AverageMeter()
+
+    adversary = LinfPGDAttack(
+        model, loss_fn=criterion, eps=8/255, nb_iter=n_step, eps_iter=2/255,
+        rand_init=False, clip_min=0.0, clip_max=1.0, targeted=False
+    )
+
+    model.eval()
+    start = time.time()
+    for i, (input, target) in enumerate(val_loader):
+
+        input = input.cuda()
+        target = target.cuda()
+
+        #adv samples
+        input_adv = adversary.perturb(input, target)
+        # compute output
+        with torch.no_grad():
+            output = model(input_adv)
+            loss = criterion(output, target)
+
+        output = output.float()
+        loss = loss.float()
+
+        # measure accuracy and record loss
+        prec1 = accuracy(output.data, target)[0]
+        losses.update(loss.item(), input.size(0))
+        top1.update(prec1.item(), input.size(0))
+
+        # if i % args.print_freq == 0:
+        #     end = time.time()
+        #     print('Test: [{0}/{1}]\t'
+        #         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+        #         'Accuracy {top1.val:.3f} ({top1.avg:.3f})\t'
+        #         'Time {2:.2f}'.format(
+        #             i, len(val_loader), end-start, loss=losses, top1=top1))
+        #     start = time.time()
+
+    print('Robust Accuracy {top1.avg:.3f}'.format(top1=top1))
+
+    return top1.avg
+
 
 def tiny_imagenet_dataloaders(batch_size=32, data_dir = 'datasets/tiny-imagenet-200', permutation_seed=10):
 
