@@ -150,11 +150,11 @@ def main():
     elif dataset == 'cifar100':
         num_classes=100
         #item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
-        train_loader, val_loader, test_loader = cifar100_dataloaders((batch_size = args.batch_size,data_dir=args.data)
+        train_loader, val_loader, test_loader = cifar100_dataloaders(batch_size = args.batch_size,data_dir=args.data)
 
     elif dataset == 'tiny':
         num_classes = 200
-        train_loader, val_loader, test_loader = tiny_imagenet_dataloaders((batch_size = args.batch_size,data_dir=args.data)
+        train_loader, val_loader, test_loader = tiny_imagenet_dataloaders(batch_size = args.batch_size,data_dir=args.data)
         # test_dir = os.path.join(args.data, 'validation/')
         # item = datasets.ImageFolder(test_dir, transform=transform_chain)
 
