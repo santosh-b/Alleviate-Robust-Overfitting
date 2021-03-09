@@ -28,6 +28,7 @@ parser.add_argument('--weight-decay', '--wd', default=5e-4,
 parser.add_argument('--lr', type=float, default=0.1, metavar='LR',
                     help='learning rate')
 parser.add_argument('--dataset', type=str)
+parser.add_argument('--data', type=str)
 parser.add_argument('--model', type=str)
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='SGD momentum')
