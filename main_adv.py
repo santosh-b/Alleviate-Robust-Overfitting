@@ -43,7 +43,7 @@ parser.add_argument('--print_freq', default=50, type=int, help='logging frequenc
 parser.add_argument('--save_dir', help='The directory used to save the trained models', default=None, type=str)
 
 ########################## training setting ##########################
-parser.add_argument('--batch_size', type=int, default=128, help='batch size')
+parser.add_argument('--batch_size', type=int, default=64, help='batch size')
 parser.add_argument('--lr', default=0.1, type=float, help='initial learning rate')
 parser.add_argument('--decreasing_lr', default='100,105', help='decreasing strategy')
 parser.add_argument('--momentum', default=0.9, type=float, help='momentum')
@@ -145,16 +145,16 @@ def main():
     transform_chain = transforms.Compose(transform_list)
     if dataset == 'cifar10':
         num_classes=10
-        train_loader, val_loader, test_loader = cifar10_dataloaders(data_dir=args.data)
+        train_loader, val_loader, test_loader = cifar10_dataloaders(batch_size = args.batch_size, data_dir=args.data)
         #item = datasets.CIFAR10(root='cifar', train=False, transform=transform_chain, download=True)
     elif dataset == 'cifar100':
         num_classes=100
         #item = datasets.CIFAR100(root='cifar100', train=False, transform=transform_chain, download=True)
-        train_loader, val_loader, test_loader = cifar100_dataloaders(data_dir=args.data)
+        train_loader, val_loader, test_loader = cifar100_dataloaders((batch_size = args.batch_size,data_dir=args.data)
 
     elif dataset == 'tiny':
         num_classes = 200
-        train_loader, val_loader, test_loader = tiny_imagenet_dataloaders(data_dir=args.data)
+        train_loader, val_loader, test_loader = tiny_imagenet_dataloaders((batch_size = args.batch_size,data_dir=args.data)
         # test_dir = os.path.join(args.data, 'validation/')
         # item = datasets.ImageFolder(test_dir, transform=transform_chain)
 
