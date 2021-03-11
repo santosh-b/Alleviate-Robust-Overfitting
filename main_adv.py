@@ -177,6 +177,10 @@ def main():
         elif 'eb70' in args.eb_path or 'eb70' in args.save_dir:
             pct = .7
         weight_before_prune = torch.load(args.eb_path)      # early-bird tickets (dense model)
+
+        # if EB is trained with nn.DataParallel, then remove "module." in keys 
+        weight_before_prune = {k.replace('module.', ''): v for k, v in weight_before_prune.items()}
+
         if args.arch == 'resnet18':
             if dataset == 'cifar10':
                 model = resnet18(seed=0, num_classes=10)
