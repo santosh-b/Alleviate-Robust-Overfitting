@@ -20,6 +20,7 @@ parser = argparse.ArgumentParser(description='PyTorch Adversarial Training')
 
 parser.add_argument('--mode', type=str, default=None)
 parser.add_argument('--eb', type=str, default=None)
+parser.add_argument('--rewind', type=str, default=None)
 
 parser.add_argument('--eb_path', type=str, default=None)
 parser.add_argument('--grad_align_cos_lambda', type=float, default=None)
@@ -183,20 +184,25 @@ def main():
 
         if args.arch == 'resnet18':
             if dataset == 'cifar10':
+                if args.rewind is not None:
+                    rewind = resnet18(seed=0, num_classes=10)
+                    rewind.load_state_dict(torch.load(args.rewind))
+                else:
+                    rewind=None
                 model = resnet18(seed=0, num_classes=10)
                 model.load_state_dict(weight_before_prune)
                 cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar10')
+                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar10', rewind=rewind)
             elif dataset == 'cifar100':
+                if args.rewind is not None:
+                    rewind = resnet18(seed=0, num_classes=10)
+                    rewind.load_state_dict(torch.load(args.rewind))
+                else:
+                    rewind=None
                 model = resnet18(seed=0, num_classes=100)
                 model.load_state_dict(weight_before_prune)
                 cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar100')
-            elif dataset == 'tiny':
-                model = resnet18(seed=0, num_classes=200)
-                model.load_state_dict(weight_before_prune)
-                cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'tiny')
+                initial_weights, mask = get_resnet_pruned_init(model, cfg, pct, 'cifar100', rewind=rewind)
             model = initial_weights.cuda()
 
         elif args.arch == 'resnet50':
