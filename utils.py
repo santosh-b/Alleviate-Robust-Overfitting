@@ -1187,17 +1187,13 @@ def get_pruned_init(model, cfg, pct, dataset):
 
     return modelnew, cfg_mask
 
-def get_resnet_pruned_init(model, cfg, pct, dataset):
+def get_resnet_pruned_init(model, cfg, pct, dataset, rewind=None):
     if dataset == 'cifar10':
         modelnew = resnet18(seed=0, num_classes=10, cfg=cfg)
         model.cuda()
         modelnew.cuda()
     elif dataset == 'cifar100':
         modelnew = resnet18(seed=0, num_classes=100, cfg=cfg)
-        model.cuda()
-        modelnew.cuda()
-    elif dataset == 'tiny':
-        modelnew = resnet18(seed=0, num_classes=200, cfg=cfg)
         model.cuda()
         modelnew.cuda()
 
@@ -1246,12 +1242,13 @@ def get_resnet_pruned_init(model, cfg, pct, dataset):
             # cfg.append('M')
             pass
 
-    if dataset == 'cifar10':
-        model = resnet18(seed=0, num_classes=10)
-    elif dataset == 'cifar100':
-        model = resnet18(seed=0, num_classes=100)
-    elif dataset == 'tiny':
-        model = resnet18(seed=0, num_classes=200)
+    if rewind is None:
+        if dataset == 'cifar10':
+            model = resnet18(seed=0, num_classes=10)
+        elif dataset == 'cifar100':
+            model = resnet18(seed=0, num_classes=100)
+    else:
+        model = rewind
     model.cuda()
 
     old_modules = list(model.modules())
