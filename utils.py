@@ -41,12 +41,40 @@ import os
 import math
 import sys
 from torch.autograd import Variable
+from torch.nn.utils import prune as pruner
 
 from torchvision.datasets import CIFAR10, CIFAR100, ImageFolder
 
 # __all__ = ['save_checkpoint', 'setup_dataset_models', 'setup_dataset_models_standard', 'setup_seed', 'moving_average', 'bn_update', 'print_args',
 #             'train_epoch', 'train_epoch_adv', 'train_epoch_adv_dual_teacher',
 #             'test', 'test_adv']
+
+def get_resnet50_fakepruned_init(model, pct, dataset):
+    if dataset == 'cifar10':
+        modelnew = resnet50_official(seed=0, num_classes=10)
+        model.cuda()
+        modelnew.cuda()
+    elif dataset == 'cifar100':
+        modelnew = resnet50_official(seed=0, num_classes=100)
+        model.cuda()
+        modelnew.cuda()
+    elif dataset == 'tiny':
+        modelnew = resnet50_official(seed=0, num_classes=200)
+        model.cuda()
+        modelnew.cuda()
+    for [m0,m1] in zip(model.modules(), modelnew.modules()):
+        if (isinstance(m0,nn.Conv2d) and isinstance(m1, nn.Conv2d)):
+            #print(m0,m1)
+            pruner.ln_structured(
+                m0, 'weight', amount=pct, dim=1, n=1
+            )
+            pruner.CustomFromMask.apply(m1, 'weight', m0.weight_mask)
+            #m1.weight = torch.nn.Parameter(m1.weight * m0.weight_mask)
+            #grad_mask = m0.weight_mask.clone()
+            #print(grad_mask.shape != m1.weight.shape)
+            #m1.weight.register_hook(lambda g: g.mul_(m0.weight_mask))
+    #model.fc.weight_mask = torch.ones_like(model.fc.weight)
+    return modelnew
 
 def cifar10_dataloaders(batch_size=64, data_dir = 'datasets/cifar10'):
 
