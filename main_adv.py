@@ -209,18 +209,15 @@ def main():
             if dataset == 'cifar10':
                 model = resnet50_official(seed=0, num_classes=10)
                 model.load_state_dict(weight_before_prune)
-                cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'cifar10')
+                initial_weights = get_resnet50_fakepruned_init(model, pct, 'cifar10')
             elif dataset == 'cifar100':
                 model = resnet50_official(seed=0, num_classes=100)
                 model.load_state_dict(weight_before_prune)
-                cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'cifar100')
+                initial_weights = get_resnet50_fakepruned_init(model, pct, 'cifar100')
             elif dataset == 'tiny':
                 model = resnet50_official(seed=0, num_classes=200)
                 model.load_state_dict(weight_before_prune)
-                cfg = resprune(model.cuda(), pct)
-                initial_weights, mask = get_resnet50_pruned_init(model, cfg, pct, 'tiny')
+                initial_weights = get_resnet50_fakepruned_init(model, pct, 'tiny')
             model = initial_weights.cuda()
 
         elif args.arch == 'vgg16':
