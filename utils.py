@@ -98,6 +98,50 @@ def cifar10_dataloaders(batch_size=64, data_dir = 'datasets/cifar10'):
 
     return train_loader, val_loader, test_loader
 
+def train_it(train_loader, model, criterion, optimizer, epoch, args):
+    
+    losses = AverageMeter()
+    top1 = AverageMeter()
+
+    model.train()
+    start = time.time()
+    for i, (input, target) in enumerate(train_loader):
+
+        if i == 0:
+            input = input.cuda()
+            target = target.cuda()
+
+            # compute output
+            output_clean = model(input)
+            loss = criterion(output_clean, target)
+
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            output = output_clean.float()
+            loss = loss.float()
+            # measure accuracy and record loss
+            prec1 = accuracy(output.data, target)[0]
+
+            losses.update(loss.item(), input.size(0))
+            top1.update(prec1.item(), input.size(0))
+
+            # if i % args.print_freq == 0:
+            #     end = time.time()
+            #     print('Epoch: [{0}][{1}/{2}]\t'
+            #         'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+            #         'Accuracy {top1.val:.3f} ({top1.avg:.3f})\t'
+            #         'Time {3:.2f}'.format(
+            #             epoch, i, len(train_loader), end-start, loss=losses, top1=top1))
+            #     start = time.time()\
+        else:
+            break
+
+    print('train_accuracy {top1.avg:.3f}'.format(top1=top1))
+
+    return top1.avg
+
 def cifar100_dataloaders(batch_size=64, data_dir = 'datasets/cifar100'):
 
     train_transform = transforms.Compose([
