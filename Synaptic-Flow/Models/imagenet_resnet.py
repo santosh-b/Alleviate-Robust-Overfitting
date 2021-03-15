@@ -134,6 +134,8 @@ class ResNet(nn.Module):
             norm_layer = layers.BatchNorm2d
         self._norm_layer = norm_layer
 
+        rng = torch.manual_seed(0)
+
         self.inplanes = 64
         self.dilation = 1
         if replace_stride_with_dilation is None:
