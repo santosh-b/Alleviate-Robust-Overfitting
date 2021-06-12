@@ -3,6 +3,8 @@ DATA160=/datadrive_c/yucheng/imagenet-sz/160
 DATA352=/datadrive_c/yucheng/imagenet-sz/352
 DATA=/datadrive_c/yucheng/imagenet/
 
+TICKET=/datadrive_c/yucheng/TLC/ResNet50
+
 NAME=eps2
 
 CONFIG1=configs_rticket/configs_fast_phase1_${NAME}.yml
