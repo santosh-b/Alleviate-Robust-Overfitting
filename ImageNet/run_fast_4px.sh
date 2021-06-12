@@ -1,6 +1,7 @@
-DATA160=~/imagenet-sz/160
-DATA352=~/imagenet-sz/352
-DATA=~/imagenet
+# Remeber to change the path to the location of the ImageNet
+DATA160=/datadrive_c/yucheng/imagenet-sz/160
+DATA352=/datadrive_c/yucheng/imagenet-sz/352
+DATA=/datadrive_c/yucheng/imagenet/
 
 NAME=eps4
 
