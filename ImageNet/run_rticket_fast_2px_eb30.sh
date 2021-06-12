@@ -31,16 +31,16 @@ END3=trained_models/eb30_fast_adv_phase3_${NAME}_step2_eps2_repeat1/checkpoint_e
 python -u main_fast_ticket.py $DATA160 -c $CONFIG1 --output_prefix $PREFIX1 --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar | tee $OUT1
 
 # evaluation for phase 1
-# python -u main_fast.py $DATA160 -c $CONFIG1 --output_prefix $PREFIX1 --resume $END1  --evaluate | tee $EVAL1
+# python -u mainmain_fast_ticket_fast.py $DATA160 -c $CONFIG1 --output_prefix $PREFIX1 --resume $END1  --evaluate --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar | tee $EVAL1
 
 # training for phase 2
 python -u main_fast_ticket.py $DATA352 -c $CONFIG2 --output_prefix $PREFIX2 --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar  --resume $END1 | tee $OUT2
 
 # evaluation for phase 2
-# python -u main_fast.py $DATA352 -c $CONFIG2 --output_prefix $PREFIX2 --resume $END2 --evaluate | tee $EVAL2
+# python -u main_fast.py $DATA352 -c $CONFIG2 --output_prefix $PREFIX2 --resume $END2 --evaluate --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar | tee $EVAL2
 
 # training for phase 3
 python -u main_fast_ticket.py $DATA -c $CONFIG3 --output_prefix $PREFIX3 --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar  --resume $END2 | tee $OUT3
 
 # evaluation for phase 3
-# python -u main_fast.py $DATA -c $CONFIG3 --output_prefix $PREFIX3 --resume $END3 --evaluate | tee $EVAL3
+# python -u main_fast.py $DATA -c $CONFIG3 --output_prefix $PREFIX3 --resume $END3 --evaluate --eb_path $TICKET/pruned_3010_0.3/pruned.pth.tar | tee $EVAL3

@@ -14,7 +14,8 @@ import torchvision.datasets as datasets
 from torch.autograd import Variable
 import math
 import numpy as np
-from lib.utils import *
+# from lib.utils import *
+from lib.utils import parse_config_file, initiate_logger, pad_str, save_checkpoint, AverageMeter, accuracy, fgsm
 from lib.validation import validate, validate_pgd
 # import torchvision.models as models
 import models
