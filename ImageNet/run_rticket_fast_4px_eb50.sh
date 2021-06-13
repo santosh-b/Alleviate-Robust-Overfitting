@@ -5,7 +5,7 @@ DATA=/datadrive_c/yucheng/imagenet/
 
 TICKET=/datadrive_c/yucheng/TLC/ResNet50
 
-NAME=eps2
+NAME=eps4
 
 CONFIG1=configs_rticket/configs_fast_phase1_${NAME}.yml
 CONFIG2=configs_rticket/configs_fast_phase2_${NAME}.yml
@@ -23,9 +23,9 @@ EVAL1=eb50_fast_eval_phase1_${NAME}.out
 EVAL2=eb50_fast_eval_phase2_${NAME}.out
 EVAL3=eb50_fast_eval_phase3_${NAME}.out
 
-END1=trained_models/eb50_fast_adv_phase1_${NAME}_step2_eps2_repeat1/checkpoint_epoch6.pth.tar
-END2=trained_models/eb50_fast_adv_phase2_${NAME}_step2_eps2_repeat1/checkpoint_epoch12.pth.tar
-END3=trained_models/eb50_fast_adv_phase3_${NAME}_step2_eps2_repeat1/checkpoint_epoch15.pth.tar
+END1=trained_models/eb50_fast_adv_phase1_${NAME}_step2_eps4_repeat1/checkpoint_epoch6.pth.tar
+END2=trained_models/eb50_fast_adv_phase2_${NAME}_step2_eps4_repeat1/checkpoint_epoch12.pth.tar
+END3=trained_models/eb50_fast_adv_phase3_${NAME}_step2_eps4_repeat1/checkpoint_epoch15.pth.tar
 
 # training for phase 1
 python -u main_fast_ticket.py $DATA160 -c $CONFIG1 --output_prefix $PREFIX1 --eb_path $TICKET/pruned_5008_0.5/pruned.pth.tar | tee $OUT1
